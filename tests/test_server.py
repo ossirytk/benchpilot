@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import subprocess
+from typing import ClassVar
 from unittest.mock import patch
 
 import pytest
 
 import benchpilot.server as server_mod
-from benchpilot.server import bench, compare, history
+from benchpilot.server import _build_result, bench, compare, history
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -208,3 +210,104 @@ class TestHyperfineNotFound:
             pytest.raises(RuntimeError, match="hyperfine"),
         ):
             bench("echo hi")
+
+
+# ---------------------------------------------------------------------------
+# hyperfine exits non-zero (CalledProcessError)
+# ---------------------------------------------------------------------------
+
+
+class TestHyperfineCalledProcessError:
+    def _make_called_process_error(
+        self, returncode: int = 1, stderr: str = "", stdout: str = ""
+    ) -> subprocess.CalledProcessError:
+        return subprocess.CalledProcessError(returncode, "hyperfine", output=stdout, stderr=stderr)
+
+    def test_raises_runtime_error_with_exit_code(self, monkeypatch):
+        exc = self._make_called_process_error(returncode=1)
+
+        def fake_run(*args, **kwargs):
+            raise exc
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+        with pytest.raises(RuntimeError, match="exit code 1"):
+            bench("false")
+
+    def test_includes_stderr_in_message(self, monkeypatch):
+        exc = self._make_called_process_error(returncode=1, stderr="some error detail")
+
+        def fake_run(*args, **kwargs):
+            raise exc
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+        with pytest.raises(RuntimeError, match="some error detail"):
+            bench("false")
+
+    def test_includes_stdout_in_message_when_no_stderr(self, monkeypatch):
+        exc = self._make_called_process_error(returncode=1, stdout="some output")
+
+        def fake_run(*args, **kwargs):
+            raise exc
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+        with pytest.raises(RuntimeError, match="some output"):
+            bench("false")
+
+
+# ---------------------------------------------------------------------------
+# _build_result: zero values are preserved (not replaced by fallbacks)
+# ---------------------------------------------------------------------------
+
+
+class TestBuildResultZeroValues:
+    _meta: ClassVar[dict[str, object]] = {
+        "run_id": "r1",
+        "label": "test",
+        "command": "echo",
+        "runs": 1,
+        "warmup": 0,
+        "created_at": "2026-01-01T00:00:00+00:00",
+    }
+
+    def test_zero_stddev_preserved(self):
+        hr = {"mean": 0.01, "stddev": 0.0, "median": 0.01, "min": 0.01, "max": 0.01}
+        result = _build_result(hr, self._meta)
+        assert result["stddev_s"] == 0.0
+
+    def test_zero_median_preserved(self):
+        hr = {"mean": 0.01, "stddev": 0.001, "median": 0.0, "min": 0.0, "max": 0.01}
+        result = _build_result(hr, self._meta)
+        assert result["median_s"] == 0.0
+
+    def test_missing_stddev_defaults_to_zero(self):
+        hr = {"mean": 0.01, "min": 0.01, "max": 0.01}
+        result = _build_result(hr, self._meta)
+        assert result["stddev_s"] == 0.0
+
+    def test_missing_median_defaults_to_mean(self):
+        hr = {"mean": 0.05, "min": 0.04, "max": 0.06}
+        result = _build_result(hr, self._meta)
+        assert result["median_s"] == pytest.approx(0.05)
+
+
+# ---------------------------------------------------------------------------
+# history: public fields only
+# ---------------------------------------------------------------------------
+
+
+class TestHistoryPublicFields:
+    _public_keys: ClassVar[frozenset[str]] = frozenset(
+        {"run_id", "label", "command", "mean_s", "stddev_s", "median_s", "min_s", "max_s"}
+    )
+    _internal_keys: ClassVar[frozenset[str]] = frozenset({"id", "runs", "warmup", "created_at", "user_s", "system_s"})
+
+    def test_returns_only_public_fields(self, mock_hyperfine):
+        bench("echo hello", label="pub-test")
+        rows = history(label="pub-test")["runs"]
+        assert len(rows) == 1
+        assert set(rows[0].keys()) == self._public_keys
+
+    def test_does_not_leak_internal_fields(self, mock_hyperfine):
+        bench("echo hello", label="leak-test")
+        rows = history(label="leak-test")["runs"]
+        assert not self._internal_keys.intersection(rows[0].keys())

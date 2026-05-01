@@ -102,6 +102,17 @@ class TestFetchHistory:
         assert rows[1]["run_id"] == "r3"
         assert rows[2]["run_id"] == "r1"
 
+    def test_tie_broken_by_id_desc(self, conn):
+        """Rows with the same created_at are ordered by id DESC (insertion order, newest first)."""
+        ts = "2026-01-01T00:00:00+00:00"
+        store_result(conn, _make_result(run_id="r1", created_at=ts))
+        store_result(conn, _make_result(run_id="r2", created_at=ts))
+        store_result(conn, _make_result(run_id="r3", created_at=ts))
+        rows = fetch_history(conn, label="", limit=10)
+        assert rows[0]["run_id"] == "r3"
+        assert rows[1]["run_id"] == "r2"
+        assert rows[2]["run_id"] == "r1"
+
     def test_unknown_label_returns_empty(self, conn):
         store_result(conn, _make_result())
         rows = fetch_history(conn, label="does-not-exist", limit=10)

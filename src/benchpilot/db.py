@@ -82,12 +82,12 @@ def fetch_history(conn: sqlite3.Connection, label: str, limit: int) -> list[dict
     """Return up to *limit* benchmark records, optionally filtered by *label*."""
     if label:
         cursor = conn.execute(
-            "SELECT * FROM benchmarks WHERE label = ? ORDER BY created_at DESC LIMIT ?",
+            "SELECT * FROM benchmarks WHERE label = ? ORDER BY created_at DESC, id DESC LIMIT ?",
             (label, limit),
         )
     else:
         cursor = conn.execute(
-            "SELECT * FROM benchmarks ORDER BY created_at DESC LIMIT ?",
+            "SELECT * FROM benchmarks ORDER BY created_at DESC, id DESC LIMIT ?",
             (limit,),
         )
     return [dict(row) for row in cursor.fetchall()]

@@ -41,6 +41,13 @@ def _invoke_hyperfine(args: list[str]) -> dict[str, object]:
             )
         except FileNotFoundError as exc:
             raise RuntimeError(_HYPERFINE_NOT_FOUND) from exc
+        except subprocess.CalledProcessError as exc:
+            details: list[str] = [f"hyperfine failed with exit code {exc.returncode}"]
+            if exc.stderr:
+                details.append(f"stderr: {exc.stderr.strip()}")
+            if exc.stdout:
+                details.append(f"stdout: {exc.stdout.strip()}")
+            raise RuntimeError(". ".join(details)) from exc
         else:
             return json.loads(tmp_path.read_text())
     finally:
@@ -50,11 +57,13 @@ def _invoke_hyperfine(args: list[str]) -> dict[str, object]:
 def _build_result(hr: dict[str, object], meta: dict[str, object]) -> dict[str, object]:
     """Map a single hyperfine result entry to a benchpilot result dict."""
     mean_s = float(hr["mean"])  # type: ignore[arg-type]
+    stddev = hr.get("stddev")
+    median = hr.get("median")
     return {
         **meta,
         "mean_s": mean_s,
-        "stddev_s": float(hr.get("stddev") or 0.0),  # type: ignore[arg-type]
-        "median_s": float(hr.get("median") or mean_s),  # type: ignore[arg-type]
+        "stddev_s": float(0.0 if stddev is None else stddev),  # type: ignore[arg-type]
+        "median_s": float(mean_s if median is None else median),  # type: ignore[arg-type]
         "min_s": float(hr["min"]),  # type: ignore[arg-type]
         "max_s": float(hr["max"]),  # type: ignore[arg-type]
         "user_s": hr.get("user"),
@@ -206,9 +215,9 @@ def history(
         raise ValueError(msg)
 
     with get_connection() as conn:
-        runs = fetch_history(conn, label, limit)
+        rows = fetch_history(conn, label, limit)
 
-    return {"runs": runs}
+    return {"runs": [_public_fields(row) for row in rows]}
 
 
 def run() -> None:
