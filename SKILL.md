@@ -13,9 +13,9 @@ benchpilot runs command benchmarks via `hyperfine` and stores every result in a 
 
 | Tool | When to use |
 |------|-------------|
-| `benchpilot-bench` | Benchmark a shell command and store the result. Required: `command`. Optional: `runs`, `warmup`, `label`. Returns mean, min, max, stddev. |
-| `benchpilot-compare` | Run two or more commands head-to-head. Required: `commands` (array). Returns ranked results with relative speed. |
-| `benchpilot-history` | Retrieve past benchmark results from the database. Optional: `label`, `limit`. |
+| `bench` | Benchmark a shell command and store the result. Required: `command`. Optional: `runs`, `warmup`, `label`. Returns mean, median, min, max, stddev. |
+| `compare` | Run two or more commands head-to-head. Required: `commands` (array). Returns ranked results with relative speed. |
+| `history` | Retrieve past benchmark results from the database. Optional: `label`, `limit`. |
 
 ## Guidance
 
