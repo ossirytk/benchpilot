@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "benchpilot": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/benchpilot", "benchpilot"],
+      "tools": ["*"]
+    }
+  }
+}
