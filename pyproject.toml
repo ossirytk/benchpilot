@@ -5,7 +5,10 @@ description = "Benchmark runner MCP server wrapping hyperfine with SQLite result
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastmcp>=3.1.1",
+    "authlib>=1.6.11",
+    "cryptography>=46.0.7",
+    "fastmcp>=3.2.0",
+    "python-multipart>=0.0.27",
 ]
 
 [project.scripts]
@@ -13,7 +16,8 @@ benchpilot = "benchpilot.server:run"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.0.0",
+    "pip-audit>=2.9.0",
+    "pytest>=9.0.3",
     "pytest-cov>=6.0.0",
     "ruff>=0.9.0",
 ]
